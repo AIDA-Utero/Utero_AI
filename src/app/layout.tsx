@@ -20,6 +20,14 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport = {
+  themeColor: "#991b1b",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{

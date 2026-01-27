@@ -43,9 +43,9 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-red-950 to-slate-900 overflow-hidden relative">
-      {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-red-950 to-slate-900 overflow-x-hidden relative">
+      {/* Animated background elements - separated to prevent scroll issues */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 -left-20 w-96 h-96 bg-red-600/20 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-rose-600/20 rounded-full blur-3xl animate-pulse animation-delay-1000" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-150 h-150 bg-red-700/10 rounded-full blur-3xl" />
@@ -53,7 +53,7 @@ export default function Home() {
 
       {/* Grid pattern overlay */}
       <div
-        className="absolute inset-0 opacity-5 pointer-events-none"
+        className="fixed inset-0 opacity-5 pointer-events-none"
         style={{
           backgroundImage: `
             linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
@@ -86,7 +86,7 @@ export default function Home() {
       </header>
 
       {/* Main content */}
-      <main className="relative z-10 flex flex-col items-center justify-center min-h-[calc(100vh-180px)] px-4">
+      <main className="relative z-10 flex flex-col items-center justify-center min-h-[calc(100dvh-180px)] px-4">
         {/* Avatar section */}
         <div className="relative mb-8">
           {/* Glow effect behind avatar */}

@@ -123,7 +123,7 @@ const VoiceControl: React.FC<VoiceControlProps> = ({
                 onClick={handleClick}
                 disabled={state === 'processing' || state === 'speaking'}
                 className={`
-          relative w-24 h-24 rounded-full
+          relative w-20 h-20 md:w-24 md:h-24 rounded-full
           bg-gradient-to-br ${getButtonColor()}
           text-white shadow-lg
           transform transition-all duration-300
@@ -145,7 +145,7 @@ const VoiceControl: React.FC<VoiceControlProps> = ({
                 )}
 
                 {/* Icon */}
-                <span className="relative z-10 flex items-center justify-center">
+                <span className="relative z-10 flex items-center justify-center [&>svg]:w-8 [&>svg]:h-8 [&>svg]:md:w-10 [&>svg]:md:h-10">
                     {getIcon()}
                 </span>
             </button>

@@ -379,7 +379,7 @@ const AvatarCanvas: React.FC<AvatarCanvasProps> = ({ state, className = '' }) =>
             ref={canvasRef}
             width={400}
             height={400}
-            className={className}
+            className={`${className} w-full h-auto max-w-[400px] touch-none`}
             style={{ background: 'transparent' }}
         />
     );
