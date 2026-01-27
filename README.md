@@ -175,7 +175,7 @@ Custom hook yang mengelola:
 - **Browser Support**: Web Speech API (STT/TTS) bekerja paling baik di **Google Chrome** dan **Microsoft Edge**.
 - **TTS Optimization**: System prompt sudah dioptimalkan untuk output tanpa markdown symbols, sehingga TTS lebih natural.
 
-
+---
 
 ## 📧 Kontak PT Utero Kreatif Indonesia
 
