@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect } from 'react';
+import Image from 'next/image';
 import { AvatarCanvas, VoiceControl, ChatBubble } from '@/components';
 import { useVoiceAI } from '@/hooks/useVoiceAI';
+import Logo from './logo.png';
 
 export default function Home() {
   const {
@@ -41,12 +43,12 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 overflow-hidden relative">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-red-950 to-slate-900 overflow-hidden relative">
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 -left-20 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl animate-pulse animation-delay-1000" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-600/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/4 -left-20 w-96 h-96 bg-red-600/20 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-rose-600/20 rounded-full blur-3xl animate-pulse animation-delay-1000" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-red-700/10 rounded-full blur-3xl" />
       </div>
 
       {/* Grid pattern overlay */}
@@ -64,8 +66,14 @@ export default function Home() {
       {/* Header */}
       <header className="relative z-10 flex items-center justify-between px-6 py-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-            <span className="text-white font-bold text-lg">U</span>
+          <div className="w-18 h-18 relative">
+            <Image
+              src={Logo}
+              alt="Utero Logo"
+              fill
+              className="object-contain"
+              priority
+            />
           </div>
           <div>
             <h1 className="text-white font-bold text-lg tracking-tight">
@@ -87,8 +95,8 @@ export default function Home() {
               absolute inset-0 rounded-full blur-3xl transition-all duration-500
               ${state === 'listening' ? 'bg-green-500/30' : ''}
               ${state === 'processing' ? 'bg-yellow-500/30' : ''}
-              ${state === 'speaking' ? 'bg-purple-500/30' : ''}
-              ${state === 'idle' ? 'bg-indigo-500/20' : ''}
+              ${state === 'speaking' ? 'bg-rose-500/30' : ''}
+              ${state === 'idle' ? 'bg-red-500/20' : ''}
             `}
           />
 
@@ -129,7 +137,7 @@ export default function Home() {
             onClick={greet}
             className="mt-6 px-6 py-2 bg-white/10 hover:bg-white/20 rounded-full text-white/80 text-sm transition-all duration-300 border border-white/20"
           >
-            👋 Sapa Saya
+            Sapa Saya
           </button>
         )}
       </main>

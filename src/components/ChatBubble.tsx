@@ -26,7 +26,7 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ messages, currentResponse }) =>
                         className={`
               max-w-[85%] px-4 py-3 rounded-2xl
               ${message.role === 'user'
-                                ? 'bg-indigo-600 text-white rounded-br-none'
+                                ? 'bg-red-600 text-white rounded-br-none'
                                 : 'bg-white/10 backdrop-blur-md text-white border border-white/20 rounded-bl-none'
                             }
             `}

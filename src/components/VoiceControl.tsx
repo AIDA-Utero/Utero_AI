@@ -33,9 +33,9 @@ const VoiceControl: React.FC<VoiceControlProps> = ({
             case 'processing':
                 return 'from-yellow-500 to-amber-600';
             case 'speaking':
-                return 'from-purple-500 to-violet-600';
+                return 'from-rose-500 to-red-600';
             default:
-                return 'from-blue-500 to-indigo-600';
+                return 'from-red-500 to-red-700';
         }
     };
 
@@ -141,7 +141,7 @@ const VoiceControl: React.FC<VoiceControlProps> = ({
                     </>
                 )}
                 {state === 'speaking' && (
-                    <span className="absolute inset-0 rounded-full bg-purple-400 animate-pulse opacity-30" />
+                    <span className="absolute inset-0 rounded-full bg-rose-400 animate-pulse opacity-30" />
                 )}
 
                 {/* Icon */}

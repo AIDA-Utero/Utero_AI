@@ -20,13 +20,13 @@ const AvatarCanvas: React.FC<AvatarCanvasProps> = ({ state, className = '' }) =>
         hair: '#2D3748',
         eyes: '#1A202C',
         mouth: '#E53E3E',
-        shirt: '#3182CE',
+        shirt: '#B91C1C',
         background: 'transparent',
         glow: {
-            idle: 'rgba(99, 102, 241, 0.3)',
+            idle: 'rgba(185, 28, 28, 0.3)',
             listening: 'rgba(34, 197, 94, 0.5)',
             processing: 'rgba(234, 179, 8, 0.5)',
-            speaking: 'rgba(139, 92, 246, 0.5)',
+            speaking: 'rgba(244, 63, 94, 0.5)',
         },
     };
 
