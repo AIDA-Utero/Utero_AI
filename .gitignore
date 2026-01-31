@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Python Backend
+__pycache__/
+*.py[cod]
+*$py.class
+backend/audio_cache/
+backend/audio_output/
+*.mp3

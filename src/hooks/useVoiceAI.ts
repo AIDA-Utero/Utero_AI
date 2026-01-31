@@ -9,6 +9,10 @@ const SPEECH_DELAY_MS = 2500; // 2.5 seconds delay after user stops speaking
 const MAX_NETWORK_RETRIES = 3; // Maximum number of retries for network errors
 const RETRY_DELAY_BASE_MS = 1000; // Base delay for retry (will be multiplied by attempt number)
 
+// Python TTS API Configuration
+const TTS_API_URL = process.env.NEXT_PUBLIC_TTS_API_URL || 'http://localhost:5000';
+const USE_PYTHON_TTS = process.env.NEXT_PUBLIC_USE_PYTHON_TTS !== 'false'; // Enable by default
+
 // Function to clean text for TTS (remove markdown symbols that would be read aloud)
 const cleanTextForTTS = (text: string): string => {
     return text
@@ -92,11 +96,14 @@ export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn =>
         optionsRef.current = options;
     }, [options]);
 
-    // Speak text using TTS
-    const speak = useCallback((text: string) => {
+    // Audio element ref for Python TTS
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+
+    // Fallback: Speak using Web Speech Synthesis (browser built-in)
+    const speakWithWebSpeech = useCallback((text: string) => {
         if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
 
-        console.log('[TTS] Speaking:', text.substring(0, 50) + '...');
+        console.log('[TTS-Web] Fallback speaking:', text.substring(0, 50) + '...');
 
         // Cancel any ongoing speech
         window.speechSynthesis.cancel();
@@ -117,24 +124,23 @@ export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn =>
         }
 
         utterance.onstart = () => {
-            console.log('[TTS] Started speaking');
+            console.log('[TTS-Web] Started speaking');
             setState('speaking');
             optionsRef.current.onStateChange?.('speaking');
         };
 
         utterance.onend = () => {
-            console.log('[TTS] Finished speaking');
+            console.log('[TTS-Web] Finished speaking');
             setState('idle');
             optionsRef.current.onStateChange?.('idle');
         };
 
         utterance.onerror = (event) => {
-            // Ignore errors when speech is cancelled/interrupted by user
             const errorType = String(event.error || '');
             if (errorType.includes('interrupt') || errorType.includes('cancel') || !errorType) {
-                console.log('[TTS] Speech was stopped');
+                console.log('[TTS-Web] Speech was stopped');
             } else {
-                console.warn('[TTS] Error:', errorType);
+                console.warn('[TTS-Web] Error:', errorType);
             }
             setState('idle');
         };
@@ -142,6 +148,105 @@ export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn =>
         synthesisRef.current = utterance;
         window.speechSynthesis.speak(utterance);
     }, []);
+
+    // Primary: Speak using Python TTS API (gTTS - more natural voice)
+    const speakWithPythonTTS = useCallback(async (text: string): Promise<boolean> => {
+        try {
+            console.log('[TTS-Python] Requesting audio from API...');
+
+            const response = await fetch(`${TTS_API_URL}/tts/stream`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    text: text,
+                    lang: 'id',
+                    slow: false,
+                }),
+            });
+
+            if (!response.ok) {
+                console.warn('[TTS-Python] API error:', response.status);
+                return false;
+            }
+
+            // Get audio blob
+            const audioBlob = await response.blob();
+            const audioUrl = URL.createObjectURL(audioBlob);
+
+            // Create and play audio
+            if (audioRef.current) {
+                audioRef.current.pause();
+            }
+
+            const audio = new Audio(audioUrl);
+            audioRef.current = audio;
+
+            audio.onloadstart = () => {
+                console.log('[TTS-Python] Audio loading...');
+            };
+
+            audio.oncanplaythrough = () => {
+                console.log('[TTS-Python] Audio ready to play');
+            };
+
+            audio.onplay = () => {
+                console.log('[TTS-Python] Started playing');
+                setState('speaking');
+                optionsRef.current.onStateChange?.('speaking');
+            };
+
+            audio.onended = () => {
+                console.log('[TTS-Python] Finished playing');
+                setState('idle');
+                optionsRef.current.onStateChange?.('idle');
+                URL.revokeObjectURL(audioUrl); // Clean up
+            };
+
+            audio.onerror = (e) => {
+                console.warn('[TTS-Python] Audio playback error:', e);
+                URL.revokeObjectURL(audioUrl);
+                setState('idle');
+            };
+
+            // Start playback
+            await audio.play();
+            return true;
+
+        } catch (error) {
+            console.warn('[TTS-Python] Failed to use Python TTS:', error);
+            return false;
+        }
+    }, []);
+
+    // Main speak function: Try Python TTS first, fallback to Web Speech
+    const speak = useCallback(async (text: string) => {
+        if (typeof window === 'undefined') return;
+
+        console.log('[TTS] Speaking:', text.substring(0, 50) + '...');
+
+        // Cancel any ongoing speech/audio
+        if (typeof window !== 'undefined' && window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+        }
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current = null;
+        }
+
+        // Try Python TTS first if enabled
+        if (USE_PYTHON_TTS) {
+            const success = await speakWithPythonTTS(text);
+            if (success) {
+                return; // Python TTS worked
+            }
+            console.log('[TTS] Python TTS failed, falling back to Web Speech...');
+        }
+
+        // Fallback to Web Speech Synthesis
+        speakWithWebSpeech(text);
+    }, [speakWithPythonTTS, speakWithWebSpeech]);
 
     // Process message and get AI response
     const processMessage = useCallback(async (userMessage: string) => {
@@ -300,12 +405,12 @@ export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn =>
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             recognition.onresult = (event: any) => {
                 let interimTranscript = '';
-                
+
                 // Process only NEW results (from finalizedResultsCount onwards)
                 for (let i = finalizedResultsCount; i < event.results.length; i++) {
                     const result = event.results[i];
                     const transcript = result[0].transcript;
-                    
+
                     if (result.isFinal) {
                         // Commit this result permanently
                         committedTranscript += (committedTranscript ? ' ' : '') + transcript.trim();
@@ -318,7 +423,7 @@ export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn =>
 
                 // Display: committed + current interim
                 const displayTranscript = committedTranscript + (interimTranscript ? ' ' + interimTranscript : '');
-                
+
                 console.log('[STT] Display:', displayTranscript);
                 setTranscript(displayTranscript.trim());
 
@@ -534,10 +639,17 @@ export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn =>
         optionsRef.current.onStateChange?.('idle');
     }, []);
 
-    // Stop speaking
+    // Stop speaking (both Web Speech and Python TTS audio)
     const stopSpeaking = useCallback(() => {
+        // Stop Web Speech Synthesis
         if (typeof window !== 'undefined' && window.speechSynthesis) {
             window.speechSynthesis.cancel();
+        }
+        // Stop Python TTS Audio
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+            audioRef.current = null;
         }
         setState('idle');
         optionsRef.current.onStateChange?.('idle');

@@ -1,6 +1,6 @@
 # Dokumentasi Teknis: Utero Interactive AI
 
-**Versi Dokumen:** 1.0.0  
+**Versi Dokumen:** 1.1.0  
 **Tanggal:** 31 Januari 2026  
 **Penulis:** Technical Documentation Team  
 **Status:** Final
@@ -17,6 +17,7 @@
 6. [Alur Kerja Sistem (System Flow)](#6-alur-kerja-sistem-system-flow)
 7. [Panduan Deployment](#7-panduan-deployment)
 8. [Kesimpulan & Skalabilitas](#8-kesimpulan--skalabilitas)
+9. [Python TTS Backend](#9-python-tts-backend-new) *(New!)*
 
 ---
 
@@ -877,6 +878,191 @@ Utero Interactive AI adalah solusi Voice-First AI Assistant yang dibangun dengan
 3. **Monitoring**: Setup observability stack (Prometheus + Grafana) untuk production monitoring
 4. **Backup Strategy**: Implementasi backup regular untuk conversation history
 5. **Security Audit**: Lakukan penetration testing sebelum production release
+
+---
+
+## 9. Python TTS Backend (New!)
+
+### 9.1 Overview
+
+Sistem TTS (Text-to-Speech) telah di-upgrade menggunakan **Python Backend** dengan Google TTS (gTTS) yang menghasilkan suara lebih natural dibandingkan Web Speech Synthesis bawaan browser.
+
+#### Arsitektur TTS
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                         TTS ARCHITECTURE                              │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│    ┌─────────────────────────────────────────────────────────────┐   │
+│    │                        Frontend (Next.js)                    │   │
+│    │  ┌───────────────────────────────────────────────────────┐  │   │
+│    │  │  useVoiceAI Hook                                      │  │   │
+│    │  │  ├── speak() function                                 │  │   │
+│    │  │  │   ├── 1. Try Python TTS API (Primary)              │  │   │
+│    │  │  │   │   └── POST /tts/stream                         │  │   │
+│    │  │  │   └── 2. Fallback to Web Speech (Backup)           │  │   │
+│    │  │  │       └── SpeechSynthesisUtterance                 │  │   │
+│    │  │  └── Audio playback via HTMLAudioElement              │  │   │
+│    │  └───────────────────────────────────────────────────────┘  │   │
+│    └─────────────────────────────────│────────────────────────────┘   │
+│                                      │                                │
+│                                      ▼                                │
+│    ┌─────────────────────────────────────────────────────────────┐   │
+│    │                   Python Backend (Flask)                     │   │
+│    │  ┌───────────────────────────────────────────────────────┐  │   │
+│    │  │  Endpoints:                                           │  │   │
+│    │  │  ├── GET/POST /tts      - Generate audio + URL        │  │   │
+│    │  │  ├── POST /tts/stream   - Stream audio directly       │  │   │
+│    │  │  ├── GET /audio/:file   - Serve audio files           │  │   │
+│    │  │  └── GET /health        - Health check                │  │   │
+│    │  └───────────────────────────────────────────────────────┘  │   │
+│    │  ┌───────────────────────────────────────────────────────┐  │   │
+│    │  │  TTSEngine (tts_module.py):                           │  │   │
+│    │  │  ├── Google TTS (gTTS) for natural voice              │  │   │
+│    │  │  ├── Audio caching for efficiency                     │  │   │
+│    │  │  └── Auto cleanup old files                           │  │   │
+│    │  └───────────────────────────────────────────────────────┘  │   │
+│    └─────────────────────────────────────────────────────────────┘   │
+│                                                                       │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### 9.2 Struktur Backend
+
+```
+backend/
+├── app.py              # Flask API server
+├── tts_module.py       # TTS module (reusable)
+├── requirements.txt    # Python dependencies
+├── README.md           # Backend documentation
+├── audio_cache/        # Cached audio files (auto-created)
+└── audio_output/       # Generated audio files (auto-created)
+```
+
+### 9.3 Dependencies Python
+
+```txt
+Flask>=2.3.0
+flask-cors>=4.0.0
+gTTS>=2.4.0
+```
+
+### 9.4 API Endpoints
+
+#### Health Check
+```
+GET /health
+
+Response:
+{
+    "status": "healthy",
+    "service": "Utero AI Backend",
+    "version": "1.0.0"
+}
+```
+
+#### Text-to-Speech
+```
+POST /tts
+Content-Type: application/json
+
+{
+    "text": "Halo, saya Utero AI",
+    "lang": "id",
+    "slow": false,
+    "stream": false
+}
+
+Response:
+{
+    "success": true,
+    "audio_url": "http://localhost:5000/audio/tts_abc123.mp3",
+    "text_length": 20,
+    "lang": "id"
+}
+```
+
+#### Stream Audio
+```
+POST /tts/stream
+Content-Type: application/json
+
+{
+    "text": "Halo, saya Utero AI",
+    "lang": "id"
+}
+
+Response: audio/mpeg (binary)
+```
+
+### 9.5 Configuration
+
+#### Environment Variables
+
+Di file `.env` frontend:
+```env
+# Enable Python TTS (set 'false' to use Web Speech only)
+NEXT_PUBLIC_USE_PYTHON_TTS=true
+
+# Python TTS API URL
+NEXT_PUBLIC_TTS_API_URL=http://localhost:5000
+```
+
+#### Testing dari Device Lain
+
+Untuk testing dari HP atau device lain dalam jaringan WiFi yang sama:
+
+1. Jalankan backend: `python backend/app.py`
+2. Catat IP address yang muncul (misal: `192.168.100.214`)
+3. Update `.env`:
+   ```env
+   NEXT_PUBLIC_TTS_API_URL=http://192.168.100.214:5000
+   ```
+4. Pastikan Windows Firewall mengizinkan port 5000
+
+### 9.6 Running Backend
+
+```bash
+# Install dependencies
+cd backend
+pip install -r requirements.txt
+
+# Run development server
+python app.py
+
+# Server akan berjalan di http://localhost:5000
+```
+
+### 9.7 Keunggulan Python TTS vs Web Speech
+
+| Aspek | Python TTS (gTTS) | Web Speech Synthesis |
+|-------|-------------------|---------------------|
+| **Kualitas Suara** | ✅ Natural, Google-quality | ⚠️ Robotic, varies by browser |
+| **Konsistensi** | ✅ Sama di semua device | ⚠️ Berbeda tiap browser/OS |
+| **Bahasa Indonesia** | ✅ Excellent | ⚠️ Limited voice options |
+| **Caching** | ✅ Built-in | ❌ No caching |
+| **Offline** | ❌ Requires internet | ✅ Works offline |
+| **Latency** | ⚠️ Network dependent | ✅ Instant |
+
+### 9.8 Fallback Mechanism
+
+Frontend akan otomatis fallback ke Web Speech Synthesis jika:
+- Python backend tidak tersedia
+- Network request timeout
+- Audio playback gagal
+
+```typescript
+// Simplified logic in useVoiceAI.ts
+const speak = async (text: string) => {
+    if (USE_PYTHON_TTS) {
+        const success = await speakWithPythonTTS(text);
+        if (success) return;
+    }
+    // Fallback to Web Speech
+    speakWithWebSpeech(text);
+};
+```
 
 ---
 
