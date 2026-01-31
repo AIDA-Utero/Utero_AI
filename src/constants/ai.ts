@@ -6,7 +6,7 @@ export interface AIModel {
    name: string;
    provider: AIProvider;
    description: string;
-   isFree?: boolean;
+   isFree?: boolean; 
 }
 
 // Available AI Models - Updated with verified working models from OpenRouter API
