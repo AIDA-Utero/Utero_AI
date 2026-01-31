@@ -18,7 +18,7 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ messages, currentResponse, clas
     }, [messages, currentResponse]);
 
     return (
-        <div className={`w-full max-w-lg mx-auto overflow-y-auto px-2 space-y-3 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent ${className}`}>
+        <div className={`w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg mx-auto overflow-y-auto px-1 sm:px-2 space-y-2 sm:space-y-3 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent ${className}`}>
             {messages.map((message, index) => (
                 <div
                     key={index}
@@ -29,14 +29,14 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ messages, currentResponse, clas
                 >
                     <div
                         className={`
-              max-w-[85%] px-4 py-3 rounded-2xl
+              max-w-[90%] sm:max-w-[85%] px-3 sm:px-4 py-2 sm:py-3 rounded-xl sm:rounded-2xl
               ${message.role === 'user'
                                 ? 'bg-red-600 text-white rounded-br-none'
                                 : 'bg-white/10 backdrop-blur-md text-white border border-white/20 rounded-bl-none'
                             }
             `}
                     >
-                        <p className="text-sm leading-relaxed">{message.content}</p>
+                        <p className="text-xs sm:text-sm leading-relaxed">{message.content}</p>
                     </div>
                 </div>
             ))}
@@ -44,8 +44,8 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ messages, currentResponse, clas
             {/* Current response being spoken */}
             {currentResponse && messages[messages.length - 1]?.content !== currentResponse && (
                 <div className="flex justify-start animate-fadeIn">
-                    <div className="max-w-[85%] px-4 py-3 rounded-2xl bg-white/10 backdrop-blur-md text-white border border-white/20 rounded-bl-none">
-                        <p className="text-sm leading-relaxed">{currentResponse}</p>
+                    <div className="max-w-[90%] sm:max-w-[85%] px-3 sm:px-4 py-2 sm:py-3 rounded-xl sm:rounded-2xl bg-white/10 backdrop-blur-md text-white border border-white/20 rounded-bl-none">
+                        <p className="text-xs sm:text-sm leading-relaxed">{currentResponse}</p>
                     </div>
                 </div>
             )}

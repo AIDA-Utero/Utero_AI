@@ -115,6 +115,19 @@ body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Prevent horizontal scroll on mobile */
+  overflow-x: hidden;
+}
+
+/* Safe area support for mobile devices */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
 }
 
 /* Focus styles */
@@ -127,4 +140,47 @@ body {
 ::selection {
   background: rgba(185, 28, 28, 0.3);
   color: white;
+}
+
+/* Responsive sizing utilities */
+@media (min-width: 640px) {
+  .sm\:w-18 {
+    width: 4.5rem;
+  }
+
+  .sm\:h-18 {
+    height: 4.5rem;
+  }
+}
+
+/* Touch improvements for mobile */
+@media (max-width: 640px) {
+
+  button,
+  select,
+  [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Ensure proper aspect ratio support */
+.aspect-square {
+  aspect-ratio: 1 / 1;
+}
+
+/* Viewport height fix for mobile browsers */
+html {
+  height: -webkit-fill-available;
+}
+
+body {
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+}
+
+/* Prevent text selection on interactive elements */
+button,
+[role="button"] {
+  -webkit-user-select: none;
+  user-select: none;
 }

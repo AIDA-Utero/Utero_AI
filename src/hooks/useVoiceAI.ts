@@ -2,10 +2,37 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { VoiceState, Message, ChatResponse } from '@/types';
-import { DEFAULT_MODEL, GREETING_MESSAGE } from '@/constants/ai';
+import { DEFAULT_MODEL, GREETING_MESSAGE, getModelById, AIProvider } from '@/constants/ai';
 
 // Configuration
 const SPEECH_DELAY_MS = 2500; // 2.5 seconds delay after user stops speaking
+const MAX_NETWORK_RETRIES = 3; // Maximum number of retries for network errors
+const RETRY_DELAY_BASE_MS = 1000; // Base delay for retry (will be multiplied by attempt number)
+
+// Function to clean text for TTS (remove markdown symbols that would be read aloud)
+const cleanTextForTTS = (text: string): string => {
+    return text
+        // Remove thinking tags
+        .replace(/<think>[\s\S]*?<\/think>/g, '')
+        // Remove bold/italic markers (**, *, __)
+        .replace(/\*\*([^*]+)\*\*/g, '$1')  // **bold** -> bold
+        .replace(/\*([^*]+)\*/g, '$1')      // *italic* -> italic
+        .replace(/__([^_]+)__/g, '$1')      // __underline__ -> underline
+        .replace(/_([^_]+)_/g, '$1')        // _italic_ -> italic
+        // Remove headers (#, ##, ###)
+        .replace(/^#{1,6}\s*/gm, '')
+        // Remove bullet points and list markers
+        .replace(/^[\s]*[-*+]\s+/gm, '')    // - item, * item, + item
+        .replace(/^[\s]*\d+\.\s+/gm, '')    // 1. item, 2. item
+        // Remove code blocks
+        .replace(/```[\s\S]*?```/g, '')
+        .replace(/`([^`]+)`/g, '$1')        // `code` -> code
+        // Remove remaining asterisks and underscores
+        .replace(/[*_]/g, '')
+        // Remove excessive whitespace
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+};
 
 // Interface definitions
 interface UseVoiceAIOptions {
@@ -13,6 +40,7 @@ interface UseVoiceAIOptions {
     onTranscript?: (text: string) => void;
     onResponse?: (text: string) => void;
     onError?: (error: string) => void;
+    initialModel?: string;
 }
 
 interface UseVoiceAIReturn {
@@ -26,6 +54,9 @@ interface UseVoiceAIReturn {
     stopSpeaking: () => void;
     messages: Message[];
     greet: () => void;
+    currentModel: string;
+    setCurrentModel: (modelId: string) => void;
+    networkError: boolean;
 }
 
 export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn => {
@@ -34,6 +65,8 @@ export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn =>
     const [response, setResponse] = useState('');
     const [messages, setMessages] = useState<Message[]>([]);
     const [isSupported, setIsSupported] = useState(false);
+    const [currentModel, setCurrentModel] = useState(options.initialModel || DEFAULT_MODEL);
+    const [networkError, setNetworkError] = useState(false);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const recognitionRef = useRef<any>(null);
@@ -45,6 +78,10 @@ export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn =>
     // Debounce timer for speech processing
     const speechTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const accumulatedTranscriptRef = useRef<string>('');
+
+    // Network retry tracking
+    const networkRetryCountRef = useRef<number>(0);
+    const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Keep refs updated
     useEffect(() => {
@@ -92,7 +129,13 @@ export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn =>
         };
 
         utterance.onerror = (event) => {
-            console.error('[TTS] Error:', event);
+            // Ignore errors when speech is cancelled/interrupted by user
+            const errorType = String(event.error || '');
+            if (errorType.includes('interrupt') || errorType.includes('cancel') || !errorType) {
+                console.log('[TTS] Speech was stopped');
+            } else {
+                console.warn('[TTS] Error:', errorType);
+            }
             setState('idle');
         };
 
@@ -110,12 +153,17 @@ export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn =>
         setMessages((prev) => [...prev, newUserMessage]);
 
         try {
+            // Get provider from model info
+            const modelInfo = getModelById(currentModel);
+            const provider: AIProvider = modelInfo?.provider || 'gemini';
+
             const res = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     message: userMessage,
-                    model: DEFAULT_MODEL,
+                    model: currentModel,
+                    provider: provider,
                     history: messagesRef.current.slice(-10),
                 }),
             });
@@ -143,10 +191,8 @@ export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn =>
 
             const aiResponse = data.choices?.[0]?.message?.content || 'Maaf, terjadi kesalahan.';
 
-            // Clean up response (remove thinking tags if any)
-            const cleanResponse = aiResponse
-                .replace(/<think>[\s\S]*?<\/think>/g, '')
-                .trim();
+            // Clean up response for TTS (remove thinking tags, markdown symbols, etc.)
+            const cleanResponse = cleanTextForTTS(aiResponse);
 
             setResponse(cleanResponse);
             optionsRef.current.onResponse?.(cleanResponse);
@@ -162,7 +208,7 @@ export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn =>
             setResponse('Maaf, terjadi kesalahan koneksi. Pastikan API Key sudah dikonfigurasi dengan benar.');
             optionsRef.current.onError?.('Gagal mendapatkan respons dari AI');
         }
-    }, [speak]);
+    }, [speak, currentModel]);
 
     // Store processMessage in ref to avoid useEffect dependency issues
     const processMessageRef = useRef(processMessage);
@@ -302,7 +348,39 @@ export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn =>
                     return;
                 }
 
+                // Handle network errors with retry
+                if (event.error === 'network') {
+                    if (networkRetryCountRef.current < MAX_NETWORK_RETRIES) {
+                        networkRetryCountRef.current++;
+                        setNetworkError(true);
+                        console.log(`[STT] Network error detected. Retrying (${networkRetryCountRef.current}/${MAX_NETWORK_RETRIES})...`);
+
+                        const delay = RETRY_DELAY_BASE_MS * networkRetryCountRef.current;
+
+                        // Clear existing retry timeout
+                        if (retryTimeoutRef.current) {
+                            clearTimeout(retryTimeoutRef.current);
+                        }
+
+                        retryTimeoutRef.current = setTimeout(() => {
+                            if (recognitionRef.current && state === 'listening') {
+                                console.log('[STT] Attempting retry start...');
+                                try {
+                                    recognitionRef.current.start();
+                                } catch (e) {
+                                    console.error('[STT] Retry start failed:', e);
+                                }
+                            }
+                        }, delay);
+                        return; // Skip default error handling
+                    } else {
+                        console.log('[STT] Max network retries reached');
+                    }
+                }
+
                 setState('idle');
+                setNetworkError(false); // Reset network error state on final failure or other errors
+                networkRetryCountRef.current = 0;
 
                 // Provide user-friendly error messages
                 let errorMessage = 'Speech recognition error';
@@ -381,11 +459,18 @@ export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn =>
         // Reset state
         setTranscript('');
         accumulatedTranscriptRef.current = '';
+        setNetworkError(false);
+        networkRetryCountRef.current = 0;
 
         // Clear any existing timeout
         if (speechTimeoutRef.current) {
             clearTimeout(speechTimeoutRef.current);
             speechTimeoutRef.current = null;
+        }
+
+        if (retryTimeoutRef.current) {
+            clearTimeout(retryTimeoutRef.current);
+            retryTimeoutRef.current = null;
         }
 
         setState('listening');
@@ -394,9 +479,14 @@ export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn =>
         try {
             console.log('[STT] Starting recognition...');
             recognitionRef.current.start();
-        } catch (error) {
+        } catch (error: any) {
             console.error('[STT] Error starting recognition:', error);
-            setState('idle');
+            // If recognition is already started, that's fine, we can treat it as success
+            if (error.name === 'InvalidStateError' || (error.message && error.message.includes('already started'))) {
+                console.log('[STT] Recognition was already active, continuing...');
+            } else {
+                setState('idle');
+            }
         }
     }, [state]);
 
@@ -446,5 +536,8 @@ export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn =>
         stopSpeaking,
         messages,
         greet,
+        currentModel,
+        setCurrentModel,
+        networkError,
     };
 };
