@@ -25,7 +25,6 @@ export default function Home() {
     onError: (error) => console.error('Voice AI Error:', error),
   });
 
-  // Greet on first load
   useEffect(() => {
     const timer = setTimeout(() => {
       if ('speechSynthesis' in window) {
@@ -100,22 +99,20 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Main content - Flex Col & Center untuk semua ukuran layar */}
+      {/* Main content */}
       <main className="relative z-10 flex-1 flex flex-col items-center justify-center min-h-0 px-4 gap-4 md:gap-6 pb-2">
         
         {/* Avatar section */}
         <div className="relative shrink-0 flex items-center justify-center w-[150px] h-[150px] sm:w-[200px] sm:h-[200px] lg:w-[30vh] lg:h-[30vh]">
-          {/* Glow effect - Penulisan className satu baris (Anti Hydration Error) */}
           <div className={`absolute inset-0 rounded-full blur-2xl transition-all duration-500 ${state === 'listening' ? 'bg-green-500/30' : ''} ${state === 'processing' ? 'bg-yellow-500/30' : ''} ${state === 'speaking' ? 'bg-rose-500/30' : ''} ${state === 'idle' ? 'bg-red-500/20' : ''}`} />
           
           <AvatarCanvas state={state} className="relative z-10 w-full h-full" />
         </div>
 
         {/* Response & Controls Wrapper */}
-        {/* Tidak pakai flex-1 agar tidak melar (fixing jarak terlalu jauh) */}
         <div className="w-full max-w-2xl flex flex-col items-center gap-6 mt-4">
           
-          {/* Chat Bubble Area - Max Height agar bisa discroll tapi tidak menutupi avatar */}
+          {/* Chat Bubble Area */}
           <div className="w-full max-h-[50vh] overflow-y-auto px-2 custom-scrollbar flex flex-col items-center">
             {response && !messages.length ? (
               <div className="text-center">
@@ -159,7 +156,7 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Footer - Sembunyi saat Landscape Mobile agar layar lega */}
+      {/* Footer */}
       <footer className="relative z-10 text-center py-3 shrink-0 landscape:hidden md:landscape:block">
         <p className="text-white/30 text-[10px] sm:text-xs">
          © 2026 PT Utero Kreatif Indonesia X POLINEMA DEV

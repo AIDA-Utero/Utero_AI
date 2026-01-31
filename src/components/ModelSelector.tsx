@@ -34,7 +34,7 @@ export const ModelSelector = ({ selectedModel, onModelChange, disabled }: ModelS
 
   return (
     <div className="relative" ref={dropdownRef}>
-      {/* Tombol Utama */}
+      {/* Button */}
       <button
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
@@ -52,7 +52,7 @@ export const ModelSelector = ({ selectedModel, onModelChange, disabled }: ModelS
         <ChevronDown className={`w-3 h-3 sm:w-4 sm:h-4 opacity-50 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
-      {/* MENU DROPDOWN */}
+      {/* Dropdown Menu */}
       {isOpen && (
         <div className="
           absolute right-0 top-full mt-2 
