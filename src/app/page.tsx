@@ -82,7 +82,7 @@ export default function Home() {
               sizes="56px"
             />
           </div>
-          <div className="hidden xs:block">
+          <div className="hidden sm:block">
             <h1 className="text-white font-bold text-sm md:text-lg tracking-tight whitespace-nowrap">
               Utero AI
             </h1>
