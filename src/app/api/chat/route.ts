@@ -204,19 +204,8 @@ export async function POST(request: NextRequest) {
                 responseData = result.data;
                 usedModel = result.usedModel;
             } else {
-                try {
-                    responseData = await callGemini(messages, selectedModel);
-                } catch (geminiError) {
-                    console.log('[Chat API] Gemini failed, trying OpenRouter:', geminiError);
-                    // Fallback to OpenRouter if Gemini fails (e.g., quota exceeded)
-                    if (process.env.OPENROUTER_API_KEY) {
-                        const result = await callOpenRouter(messages, FALLBACK_MODELS[0]);
-                        responseData = result.data;
-                        usedModel = result.usedModel;
-                    } else {
-                        throw geminiError;
-                    }
-                }
+                // Use Gemini directly, don't fallback to OpenRouter
+                responseData = await callGemini(messages, selectedModel);
             }
         } else {
             // OpenRouter

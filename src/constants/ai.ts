@@ -9,15 +9,29 @@ export interface AIModel {
    isFree?: boolean; 
 }
 
-// Available AI Models - Updated with verified working models from OpenRouter API
+// Available AI Models - Gemini first (more reliable), then OpenRouter
 export const AI_MODELS: AIModel[] = [
-   // OpenRouter Models (Free) - Verified from OpenRouter API January 2026
-   // Ordered by stability/availability
+   // Gemini Models (requires API quota - usually more reliable)
+   {
+      id: 'gemini-2.0-flash',
+      name: 'Gemini 2.0 Flash',
+      provider: 'gemini',
+      description: 'Google Gemini 2.0 Flash - Latest & Fast',
+      isFree: true,
+   },
+   {
+      id: 'gemini-1.5-flash',
+      name: 'Gemini 1.5 Flash',
+      provider: 'gemini',
+      description: 'Google Gemini 1.5 Flash - Balanced',
+      isFree: true,
+   },
+   // OpenRouter Models (Free)
    {
       id: 'nvidia/nemotron-nano-9b-v2:free',
       name: 'Nemotron Nano 9B',
       provider: 'openrouter',
-      description: 'NVIDIA Nemotron Nano 9B V2 (Free) - Most Stable',
+      description: 'NVIDIA Nemotron Nano 9B V2 (Free)',
       isFree: true,
    },
    {
@@ -69,33 +83,11 @@ export const AI_MODELS: AIModel[] = [
       description: 'Meta Llama 3.1 405B Instruct (Free) - Largest',
       isFree: true,
    },
-   // Gemini Models (requires API quota - may have rate limits)
-   {
-      id: 'gemini-2.0-flash',
-      name: 'Gemini 2.0 Flash',
-      provider: 'gemini',
-      description: 'Google Gemini 2.0 Flash - Latest & Fast (Quota Limited)',
-      isFree: true,
-   },
-   {
-      id: 'gemini-1.5-flash',
-      name: 'Gemini 1.5 Flash',
-      provider: 'gemini',
-      description: 'Google Gemini 1.5 Flash - Balanced (Quota Limited)',
-      isFree: true,
-   },
-   {
-      id: 'gemini-1.5-pro',
-      name: 'Gemini 1.5 Pro',
-      provider: 'gemini',
-      description: 'Google Gemini 1.5 Pro - Most Capable (Quota Limited)',
-      isFree: false,
-   },
 ];
- 
-// Default to the most stable OpenRouter model (verified working)
-export const DEFAULT_MODEL = 'nvidia/nemotron-nano-9b-v2:free';
-export const DEFAULT_PROVIDER: AIProvider = 'openrouter';
+
+// Default to Gemini (more reliable when OpenRouter rate limited)
+export const DEFAULT_MODEL = 'gemini-2.0-flash';
+export const DEFAULT_PROVIDER: AIProvider = 'gemini';
 
 // Helper function to get model by ID
 export const getModelById = (modelId: string): AIModel | undefined => {

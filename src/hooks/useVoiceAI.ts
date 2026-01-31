@@ -13,32 +13,24 @@ const RETRY_DELAY_BASE_MS = 1000; // Base delay for retry (will be multiplied by
 const TTS_API_URL = process.env.NEXT_PUBLIC_TTS_API_URL || 'http://localhost:5000';
 const USE_PYTHON_TTS = process.env.NEXT_PUBLIC_USE_PYTHON_TTS !== 'false'; // Enable by default
 
-// Function to clean text for TTS (remove markdown symbols that would be read aloud)
+// Clean text for TTS
 const cleanTextForTTS = (text: string): string => {
     return text
-        // Remove thinking tags
         .replace(/<think>[\s\S]*?<\/think>/g, '')
-        // Remove bold/italic markers (**, *, __)
-        .replace(/\*\*([^*]+)\*\*/g, '$1')  // **bold** -> bold
-        .replace(/\*([^*]+)\*/g, '$1')      // *italic* -> italic
-        .replace(/__([^_]+)__/g, '$1')      // __underline__ -> underline
-        .replace(/_([^_]+)_/g, '$1')        // _italic_ -> italic
-        // Remove headers (#, ##, ###)
+        .replace(/\*\*([^*]+)\*\*/g, '$1')
+        .replace(/\*([^*]+)\*/g, '$1')
+        .replace(/__([^_]+)__/g, '$1')
+        .replace(/_([^_]+)_/g, '$1')
         .replace(/^#{1,6}\s*/gm, '')
-        // Remove bullet points and list markers
-        .replace(/^[\s]*[-*+]\s+/gm, '')    // - item, * item, + item
-        .replace(/^[\s]*\d+\.\s+/gm, '')    // 1. item, 2. item
-        // Remove code blocks
+        .replace(/^[\s]*[-*+]\s+/gm, '')
+        .replace(/^[\s]*\d+\.\s+/gm, '')
         .replace(/```[\s\S]*?```/g, '')
-        .replace(/`([^`]+)`/g, '$1')        // `code` -> code
-        // Remove remaining asterisks and underscores
+        .replace(/`([^`]+)`/g, '$1')
         .replace(/[*_]/g, '')
-        // Remove excessive whitespace
         .replace(/\n{3,}/g, '\n\n')
         .trim();
 };
 
-// Interface definitions
 interface UseVoiceAIOptions {
     onStateChange?: (state: VoiceState) => void;
     onTranscript?: (text: string) => void;
@@ -64,6 +56,7 @@ interface UseVoiceAIReturn {
 }
 
 export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn => {
+    // State
     const [state, setState] = useState<VoiceState>('idle');
     const [transcript, setTranscript] = useState('');
     const [response, setResponse] = useState('');
@@ -72,22 +65,24 @@ export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn =>
     const [currentModel, setCurrentModel] = useState(options.initialModel || DEFAULT_MODEL);
     const [networkError, setNetworkError] = useState(false);
 
+    // Refs for mutable values (Strict Mode safe)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const recognitionRef = useRef<any>(null);
     const synthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
     const messagesRef = useRef<Message[]>([]);
     const optionsRef = useRef(options);
-    const isInitializedRef = useRef(false);
-
-    // Debounce timer for speech processing
+    
+    // STT tracking refs (prevents stale closure issues)
+    const finalizedCountRef = useRef<number>(0);
+    const committedTranscriptRef = useRef<string>('');
+    const isListeningRef = useRef<boolean>(false);
+    
+    // Timers
     const speechTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const accumulatedTranscriptRef = useRef<string>('');
-
-    // Network retry tracking
-    const networkRetryCountRef = useRef<number>(0);
     const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const networkRetryCountRef = useRef<number>(0);
 
-    // Keep refs updated
+    // Sync refs with state/props
     useEffect(() => {
         messagesRef.current = messages;
     }, [messages]);
@@ -114,7 +109,6 @@ export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn =>
         utterance.pitch = 1.0;
         utterance.volume = 1.0;
 
-        // Try to find Indonesian voice
         const voices = window.speechSynthesis.getVoices();
         const indonesianVoice = voices.find(
             (voice) => voice.lang.includes('id') || voice.lang.includes('ID')
@@ -258,7 +252,6 @@ export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn =>
         setMessages((prev) => [...prev, newUserMessage]);
 
         try {
-            // Get provider from model info
             const modelInfo = getModelById(currentModel);
             const provider: AIProvider = modelInfo?.provider || 'gemini';
 
@@ -273,30 +266,19 @@ export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn =>
                 }),
             });
 
-            console.log('[AI] API Response status:', res.status);
-
             if (!res.ok) {
-                let errorData;
-                try {
-                    errorData = await res.json();
-                } catch {
-                    // If JSON parsing fails, try to get text
-                    try {
-                        errorData = await res.text();
-                    } catch {
-                        errorData = 'Unknown error';
-                    }
+                const errorData = await res.json().catch(() => ({}));
+                const errorDetail = errorData?.details || 'Unknown error';
+                
+                // Check for quota/rate limit errors
+                if (errorDetail.includes('Quota') || errorDetail.includes('Rate limit')) {
+                    throw new Error('QUOTA_EXCEEDED');
                 }
-                console.error('[AI] API Error:', errorData, 'Status:', res.status);
-                throw new Error('Failed to get response from AI');
+                throw new Error(errorDetail);
             }
 
             const data: ChatResponse = await res.json();
-            console.log('[AI] Response data:', data);
-
             const aiResponse = data.choices?.[0]?.message?.content || 'Maaf, terjadi kesalahan.';
-
-            // Clean up response for TTS (remove thinking tags, markdown symbols, etc.)
             const cleanResponse = cleanTextForTTS(aiResponse);
 
             setResponse(cleanResponse);
@@ -305,44 +287,44 @@ export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn =>
             const newAssistantMessage: Message = { role: 'assistant', content: cleanResponse };
             setMessages((prev) => [...prev, newAssistantMessage]);
 
-            // Speak the response
             speak(cleanResponse);
         } catch (error) {
-            console.error('[AI] Error processing message:', error);
+            console.error('[AI] Error:', error);
             setState('idle');
-            setResponse('Maaf, terjadi kesalahan koneksi. Pastikan API Key sudah dikonfigurasi dengan benar.');
+            
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            
+            if (errorMessage === 'QUOTA_EXCEEDED') {
+                const quotaMessage = 'Maaf, kuota API sudah habis untuk hari ini. Silakan coba lagi besok atau hubungi administrator.';
+                setResponse(quotaMessage);
+                speak(quotaMessage);
+            } else {
+                setResponse('Maaf, terjadi kesalahan koneksi. Silakan coba lagi.');
+            }
+            
             optionsRef.current.onError?.('Gagal mendapatkan respons dari AI');
         }
     }, [speak, currentModel]);
 
-    // Store processMessage in ref to avoid useEffect dependency issues
     const processMessageRef = useRef(processMessage);
     useEffect(() => {
         processMessageRef.current = processMessage;
     }, [processMessage]);
 
-    // Debounced process - waits for user to stop speaking
+    // Schedule processing after speech delay
     const scheduleProcessing = useCallback((finalText: string) => {
-        // Clear any existing timeout
         if (speechTimeoutRef.current) {
             clearTimeout(speechTimeoutRef.current);
-            console.log('[STT] Cleared previous timeout, accumulating speech...');
         }
 
-        // Accumulate transcript
-        accumulatedTranscriptRef.current = finalText;
-        setTranscript(finalText);
-        optionsRef.current.onTranscript?.(finalText);
+        console.log(`[STT] Scheduling processing in ${SPEECH_DELAY_MS}ms...`);
 
-        console.log(`[STT] Waiting ${SPEECH_DELAY_MS}ms for more speech...`);
-
-        // Set new timeout
         speechTimeoutRef.current = setTimeout(() => {
-            const textToProcess = accumulatedTranscriptRef.current.trim();
+            const textToProcess = finalText.trim();
             if (textToProcess) {
-                console.log('[STT] Delay complete, processing:', textToProcess);
+                console.log('[STT] Processing:', textToProcess);
 
-                // Stop recognition before processing
+                // Stop recognition
                 if (recognitionRef.current) {
                     try {
                         recognitionRef.current.stop();
@@ -351,56 +333,47 @@ export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn =>
                     }
                 }
 
-                // Process the accumulated transcript
+                isListeningRef.current = false;
                 processMessageRef.current(textToProcess);
-
-                // Reset accumulated transcript
-                accumulatedTranscriptRef.current = '';
             }
             speechTimeoutRef.current = null;
         }, SPEECH_DELAY_MS);
     }, []);
 
-    // Initialize speech recognition ONCE on mount
+    // Initialize Speech Recognition - STRICT MODE SAFE
     useEffect(() => {
         if (typeof window === 'undefined') return;
-        if (isInitializedRef.current) return; // Prevent re-initialization
 
-        console.log('[STT] Initializing Speech Recognition...');
+        console.log('[STT] useEffect running - initializing...');
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         const hasSpeechRecognition = !!SpeechRecognitionAPI;
         const hasSpeechSynthesis = 'speechSynthesis' in window;
 
-        console.log('[STT] SpeechRecognition available:', hasSpeechRecognition);
-        console.log('[TTS] SpeechSynthesis available:', hasSpeechSynthesis);
-
         setIsSupported(hasSpeechRecognition && hasSpeechSynthesis);
 
-        // Load voices
         if (hasSpeechSynthesis) {
             window.speechSynthesis.getVoices();
-            window.speechSynthesis.addEventListener('voiceschanged', () => {
-                window.speechSynthesis.getVoices();
-            });
         }
 
-        if (hasSpeechRecognition) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const recognition = new SpeechRecognitionAPI();
-            recognition.continuous = true; // Allow continuous speech
-            recognition.interimResults = true;
-            recognition.lang = 'id-ID';
-            recognition.maxAlternatives = 1;
+        if (!hasSpeechRecognition) return;
 
-            recognition.onstart = () => {
-                console.log('[STT] Recognition started - listening...');
-            };
+        // Create new recognition instance
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const recognition = new SpeechRecognitionAPI();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'id-ID';
+        recognition.maxAlternatives = 1;
 
-            // Track which results have been finalized to avoid duplication
-            let finalizedResultsCount = 0;
-            let committedTranscript = ''; // Accumulated final results
+        // Event handlers using refs (prevents stale closures)
+        recognition.onstart = () => {
+            console.log('[STT] Recognition started');
+            // Reset counters on fresh start
+            finalizedCountRef.current = 0;
+            committedTranscriptRef.current = '';
+        };
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             recognition.onresult = (event: any) => {
@@ -427,193 +400,182 @@ export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn =>
                 console.log('[STT] Display:', displayTranscript);
                 setTranscript(displayTranscript.trim());
 
-                // Check if we have a new final result to process
-                const lastResult = event.results[event.results.length - 1];
-                if (lastResult.isFinal) {
-                    console.log('[STT] Got final result, scheduling processing with delay...');
-                    scheduleProcessing(committedTranscript);
-                }
-            };
+            // Schedule processing when we get a final result
+            const lastResult = event.results[resultsLength - 1];
+            if (lastResult.isFinal && committedTranscriptRef.current) {
+                scheduleProcessing(committedTranscriptRef.current);
+            }
+        };
 
-            // Reset counters when recognition starts
-            const originalOnStart = recognition.onstart;
-            recognition.onstart = () => {
-                finalizedResultsCount = 0;
-                committedTranscript = '';
-                originalOnStart?.();
-            };
+        recognition.onspeechstart = () => {
+            console.log('[STT] Speech detected');
+            // Cancel pending processing if user continues speaking
+            if (speechTimeoutRef.current) {
+                clearTimeout(speechTimeoutRef.current);
+                speechTimeoutRef.current = null;
+                console.log('[STT] Cancelled pending timeout - user still speaking');
+            }
+        };
 
-            recognition.onspeechstart = () => {
-                console.log('[STT] Speech detected');
-                // Clear timeout if user starts speaking again
-                if (speechTimeoutRef.current) {
-                    clearTimeout(speechTimeoutRef.current);
-                    speechTimeoutRef.current = null;
-                    console.log('[STT] User speaking again, cleared timeout');
-                }
-            };
+        recognition.onspeechend = () => {
+            console.log('[STT] Speech ended');
+        };
 
-            recognition.onspeechend = () => {
-                console.log('[STT] Speech ended');
-            };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        recognition.onerror = (event: any) => {
+            console.error('[STT] Error:', event.error);
 
-            recognition.onnomatch = () => {
-                console.log('[STT] No match found');
-            };
-
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            recognition.onerror = (event: any) => {
-                console.error('[STT] Recognition error:', event.error, event);
-
-                // Clear any pending timeout
-                if (speechTimeoutRef.current) {
-                    clearTimeout(speechTimeoutRef.current);
-                    speechTimeoutRef.current = null;
-                }
-
-                // Don't set idle for no-speech error if we're waiting for more input
-                if (event.error === 'no-speech') {
-                    console.log('[STT] No speech detected, but keeping listening state');
-                    return;
-                }
-
-                // Handle network errors with retry
-                if (event.error === 'network') {
-                    if (networkRetryCountRef.current < MAX_NETWORK_RETRIES) {
-                        networkRetryCountRef.current++;
-                        setNetworkError(true);
-                        console.log(`[STT] Network error detected. Retrying (${networkRetryCountRef.current}/${MAX_NETWORK_RETRIES})...`);
-
-                        const delay = RETRY_DELAY_BASE_MS * networkRetryCountRef.current;
-
-                        // Clear existing retry timeout
-                        if (retryTimeoutRef.current) {
-                            clearTimeout(retryTimeoutRef.current);
-                        }
-
-                        retryTimeoutRef.current = setTimeout(() => {
-                            if (recognitionRef.current && state === 'listening') {
-                                console.log('[STT] Attempting retry start...');
-                                try {
-                                    recognitionRef.current.start();
-                                } catch (e) {
-                                    console.error('[STT] Retry start failed:', e);
-                                }
-                            }
-                        }, delay);
-                        return; // Skip default error handling
-                    } else {
-                        console.log('[STT] Max network retries reached');
-                    }
-                }
-
-                setState('idle');
-                setNetworkError(false); // Reset network error state on final failure or other errors
-                networkRetryCountRef.current = 0;
-
-                // Provide user-friendly error messages
-                let errorMessage = 'Speech recognition error';
-                if (event.error === 'not-allowed') {
-                    errorMessage = 'Microphone access denied. Please allow microphone access.';
-                } else if (event.error === 'network') {
-                    errorMessage = 'Network error. Please check your connection.';
-                }
-
-                optionsRef.current.onError?.(errorMessage);
-            };
-
-            recognition.onend = () => {
-                console.log('[STT] Recognition ended');
-
-                // If there's a pending timeout, let it complete
-                if (speechTimeoutRef.current) {
-                    console.log('[STT] Pending timeout exists, waiting for it to complete...');
-                    return;
-                }
-
-                setState((prevState) => {
-                    // Only reset to idle if we're still in listening state
-                    if (prevState === 'listening') {
-                        return 'idle';
-                    }
-                    return prevState;
-                });
-            };
-
-            recognitionRef.current = recognition;
-            isInitializedRef.current = true;
-            console.log('[STT] Recognition initialized successfully');
-        }
-
-        return () => {
-            // Clear any pending timeout
             if (speechTimeoutRef.current) {
                 clearTimeout(speechTimeoutRef.current);
                 speechTimeoutRef.current = null;
             }
 
+            if (event.error === 'no-speech') {
+                return; // Ignore, keep listening
+            }
+
+            if (event.error === 'network' && networkRetryCountRef.current < MAX_NETWORK_RETRIES) {
+                networkRetryCountRef.current++;
+                setNetworkError(true);
+                
+                const delay = RETRY_DELAY_BASE_MS * networkRetryCountRef.current;
+                retryTimeoutRef.current = setTimeout(() => {
+                    if (isListeningRef.current && recognitionRef.current) {
+                        try {
+                            recognitionRef.current.start();
+                        } catch {
+                            // Ignore
+                        }
+                    }
+                }, delay);
+                return;
+            }
+
+            // Final error - reset state
+            isListeningRef.current = false;
+            setState('idle');
+            setNetworkError(false);
+            networkRetryCountRef.current = 0;
+            optionsRef.current.onError?.('Speech recognition error');
+        };
+
+        recognition.onend = () => {
+            console.log('[STT] Recognition ended');
+
+            // If there's a pending timeout, let it handle state
+            if (speechTimeoutRef.current) {
+                return;
+            }
+
+            // Otherwise, if we were listening, go back to idle
+            if (isListeningRef.current) {
+                isListeningRef.current = false;
+                setState('idle');
+            }
+        };
+
+        recognitionRef.current = recognition;
+        console.log('[STT] Recognition initialized');
+
+        // CLEANUP - Critical for Strict Mode
+        return () => {
+            console.log('[STT] Cleanup running...');
+
+            // Clear all timers
+            if (speechTimeoutRef.current) {
+                clearTimeout(speechTimeoutRef.current);
+                speechTimeoutRef.current = null;
+            }
+            if (retryTimeoutRef.current) {
+                clearTimeout(retryTimeoutRef.current);
+                retryTimeoutRef.current = null;
+            }
+
+            // Stop and nullify recognition
             if (recognitionRef.current) {
                 try {
                     recognitionRef.current.abort();
                 } catch {
-                    // Ignore errors when aborting
+                    // Ignore
                 }
+                // Remove all listeners to prevent ghost callbacks
+                recognitionRef.current.onstart = null;
+                recognitionRef.current.onresult = null;
+                recognitionRef.current.onerror = null;
+                recognitionRef.current.onend = null;
+                recognitionRef.current.onspeechstart = null;
+                recognitionRef.current.onspeechend = null;
+                recognitionRef.current = null;
             }
+
+            // Stop TTS
             if (typeof window !== 'undefined' && window.speechSynthesis) {
                 window.speechSynthesis.cancel();
             }
+
+            isListeningRef.current = false;
+            console.log('[STT] Cleanup complete');
         };
     }, [scheduleProcessing]);
 
     // Start listening
     const startListening = useCallback(() => {
-        console.log('[STT] startListening called, current state:', state);
-        console.log('[STT] recognitionRef.current:', !!recognitionRef.current);
+        console.log('[STT] startListening called');
 
         if (!recognitionRef.current) {
-            console.error('[STT] Recognition not initialized');
+            console.error('[STT] Recognition not available');
             return;
         }
 
         if (state !== 'idle') {
-            console.log('[STT] Cannot start - not in idle state');
+            console.log('[STT] Cannot start - not idle, current state:', state);
             return;
         }
 
-        // Stop any ongoing speech
+        // Prevent double-start
+        if (isListeningRef.current) {
+            console.log('[STT] Already listening - ignoring');
+            return;
+        }
+
+        // Stop TTS if playing
         if (typeof window !== 'undefined' && window.speechSynthesis) {
             window.speechSynthesis.cancel();
         }
 
-        // Reset state
+        // Reset all tracking
         setTranscript('');
-        accumulatedTranscriptRef.current = '';
+        finalizedCountRef.current = 0;
+        committedTranscriptRef.current = '';
         setNetworkError(false);
         networkRetryCountRef.current = 0;
 
-        // Clear any existing timeout
+        // Clear timers
         if (speechTimeoutRef.current) {
             clearTimeout(speechTimeoutRef.current);
             speechTimeoutRef.current = null;
         }
-
         if (retryTimeoutRef.current) {
             clearTimeout(retryTimeoutRef.current);
             retryTimeoutRef.current = null;
         }
 
+        // Set flags BEFORE starting
+        isListeningRef.current = true;
         setState('listening');
         optionsRef.current.onStateChange?.('listening');
 
         try {
-            console.log('[STT] Starting recognition...');
             recognitionRef.current.start();
-        } catch (error: any) {
-            console.error('[STT] Error starting recognition:', error);
-            // If recognition is already started, that's fine, we can treat it as success
-            if (error.name === 'InvalidStateError' || (error.message && error.message.includes('already started'))) {
-                console.log('[STT] Recognition was already active, continuing...');
+            console.log('[STT] Recognition started successfully');
+        } catch (error: unknown) {
+            const err = error as Error;
+            // Handle "already started" gracefully
+            if (err.name === 'InvalidStateError') {
+                console.log('[STT] Recognition already running');
             } else {
+                console.error('[STT] Failed to start:', error);
+                isListeningRef.current = false;
                 setState('idle');
             }
         }
@@ -623,18 +585,21 @@ export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn =>
     const stopListening = useCallback(() => {
         console.log('[STT] stopListening called');
 
-        // Clear any pending timeout
         if (speechTimeoutRef.current) {
             clearTimeout(speechTimeoutRef.current);
             speechTimeoutRef.current = null;
         }
 
-        if (!recognitionRef.current) return;
-        try {
-            recognitionRef.current.stop();
-        } catch {
-            // Ignore errors
+        isListeningRef.current = false;
+
+        if (recognitionRef.current) {
+            try {
+                recognitionRef.current.stop();
+            } catch {
+                // Ignore
+            }
         }
+
         setState('idle');
         optionsRef.current.onStateChange?.('idle');
     }, []);
