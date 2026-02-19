@@ -91,7 +91,7 @@ export default function Home() {
           <div className="flex sm:hidden items-center gap-3">
             <Image
               src="/carubra-v1.png"
-              alt="CarubaAI"
+              alt="CarubraAI"
               width={120}
               height={120}
               className="h-12 w-auto object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.15)]"
@@ -111,7 +111,7 @@ export default function Home() {
           <div className="hidden sm:flex items-center gap-5">
             <Image
               src="/logouterov2.png"
-              alt="CarubaAI"
+              alt="CarubraAI"
               width={180}
               height={50}
               className="h-12 md:h-14 w-auto object-contain"
@@ -147,7 +147,7 @@ export default function Home() {
 
           <Image
             src="/Avatar.png"
-            alt="Caruba AI Avatar"
+            alt="Carubra AI Avatar"
             width={400}
             height={400}
             className="relative z-10 w-full h-full object-contain"
@@ -248,7 +248,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="relative z-10 text-center py-3 shrink-0 landscape:hidden md:landscape:block">
         <p className="text-white/30 text-[10px] sm:text-xs">
-          © 2026 CarubaAI — PT Utero Kreatif Indonesia X POLINEMA DEV
+          © 2026 CarubraAI — PT Utero Kreatif Indonesia X POLINEMA DEV
         </p>
       </footer>
     </div>
