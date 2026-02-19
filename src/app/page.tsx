@@ -110,11 +110,11 @@ export default function Home() {
           {/* Desktop: logo + divider + subtitle */}
           <div className="hidden sm:flex items-center gap-5">
             <Image
-              src="/carubra-v1.png"
+              src="/logouterov2.png"
               alt="CarubaAI"
-              width={200}
-              height={200}
-              className="h-14 md:h-16 lg:h-20 w-auto object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.15)]"
+              width={180}
+              height={50}
+              className="h-12 md:h-14 w-auto object-contain"
               priority
             />
             <div className="self-stretch w-px bg-gradient-to-b from-transparent via-white/20 to-transparent my-2" />
