@@ -58,7 +58,7 @@ export default function Home() {
 
 
   return (
-    <div className="h-[100dvh] w-full bg-gradient-to-br from-slate-900 via-red-950 to-slate-900 overflow-hidden relative flex flex-col">
+    <div className="fixed inset-0 h-[100dvh] w-full bg-gradient-to-br from-slate-900 via-red-950 to-slate-900 overflow-hidden flex flex-col">
 
       {/* Background elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none select-none">
@@ -128,7 +128,7 @@ export default function Home() {
       </header>
 
       {/* Main content */}
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-center min-h-0 px-4 gap-4 md:gap-6 pb-2">
+      <main className="relative z-10 flex-1 min-h-0 w-full flex flex-col items-center justify-center px-4 gap-4 md:gap-6 pb-2">
 
         {/* Avatar section */}
         <div className="relative shrink-0 flex items-center justify-center w-[150px] h-[150px] sm:w-[200px] sm:h-[200px] lg:w-[30vh] lg:h-[30vh]">
@@ -151,10 +151,10 @@ export default function Home() {
         </div>
 
         {/* Response & Controls Wrapper */}
-        <div className="w-full max-w-2xl flex flex-col items-center gap-6 mt-4">
+        <div className="w-full max-w-2xl flex flex-col items-center shrink min-h-0 gap-4 sm:gap-6 mt-2 sm:mt-4">
 
           {/* Chat Bubble Area */}
-          <div className="w-full max-h-[50vh] overflow-y-auto px-2 custom-scrollbar flex flex-col items-center">
+          <div className="w-full shrink min-h-0 overflow-y-auto px-2 custom-scrollbar flex flex-col items-center">
             {response && !messages.length ? (
               <div className="text-center">
                 <p className="inline-block text-white/90 text-sm md:text-lg leading-relaxed bg-white/5 backdrop-blur-md rounded-2xl px-6 py-4 border border-white/10 shadow-lg">
