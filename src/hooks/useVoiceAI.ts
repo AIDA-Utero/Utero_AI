@@ -284,7 +284,12 @@ export const useVoiceAI = (options: UseVoiceAIOptions = {}): UseVoiceAIReturn =>
             setResponse(cleanResponse);
             optionsRef.current.onResponse?.(cleanResponse);
 
-            const newAssistantMessage: Message = { role: 'assistant', content: cleanResponse };
+            // Store original formatted text for display, cleaned text for TTS
+            const newAssistantMessage: Message = {
+                role: 'assistant',
+                content: cleanResponse,
+                displayContent: aiResponse, // Preserve original formatting for UI
+            };
             setMessages((prev) => [...prev, newAssistantMessage]);
 
             speak(cleanResponse);

@@ -4,6 +4,7 @@ export type VoiceState = 'idle' | 'standby' | 'listening' | 'processing' | 'spea
 export interface Message {
     role: 'user' | 'assistant' | 'system';
     content: string;
+    displayContent?: string; // Original formatted text for display (content is cleaned for TTS)
 }
 
 export interface ChatResponse {

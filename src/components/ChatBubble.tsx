@@ -38,7 +38,7 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ messages, currentResponse, clas
             `}
                     >
                         {message.role === 'assistant' ? (
-                            <FormattedMessage content={message.content} />
+                            <FormattedMessage content={message.displayContent || message.content} />
                         ) : (
                             <p className="text-xs sm:text-sm leading-relaxed">{message.content}</p>
                         )}
@@ -61,3 +61,4 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ messages, currentResponse, clas
 };
 
 export default ChatBubble;
+
